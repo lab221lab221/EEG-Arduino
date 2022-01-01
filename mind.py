@@ -2,8 +2,14 @@ import serial
 import time
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+
 import multiprocessing
-#import logging
+from multiprocessing import Value, Array, Manager
+
+import threading
+
+print("kill me")
 
 """
 input("Start?")
@@ -18,19 +24,19 @@ while True:
 print(f"Sample frequency: {n/(current_time - start_time)}")
 """
 
-def control_overflow():
+def control_overflow(data, stop):
     while True:
-        cutoff = float(time.time()) - 50
-        if stop:
+        cutoff = float(time.time()) - 10
+        if stop.value == 1:
             break
         for i in data:
             if i[0] < cutoff:
-                print(data[0])
                 data.pop(0)
             else:
                 break
 
-def accept():
+def accept(data, sample_frequency, stop):
+    ser = serial.Serial('COM3', 9800, timeout=1)
     start_time = float(time.time())
     n = 0
     while True:
@@ -42,41 +48,23 @@ def accept():
         datum = [int(i) for i in datum]
         data_list = [current_time]
         data_list.extend(datum)
-        #print(data_list)
+        print(data_list)
         data.append(data_list)
         #print(len(data))
         n += 1
-        if ((current_time - start_time) > 60):
-            stop = True
-            global sample_frequency
-            sample_frequency = n/(current_time - start_time)
+        if ((current_time - start_time) > 30):
+            stop.value = 1
+            sample_frequency.value = n/(current_time - start_time)
             break
+    ser.close()
 
 def process_data():
-    optimal = 1/sample_frequency
+    optimal = 1/sample_frequency.value
     stream_data_one = [data[i][1] for i in range(len(data))]
     info = []
     pro_data = []
     ooi = False
-    """
-    for index, element in enumerate(data):
-        print(index, element)
-        if index == 0:
-            pro_data.append(element)
-        else:
-            new_time = optimal + pro_data[index-1][0]
-            time_delta = (element[0] - pro_data[index-1][0])
-            print(time_delta)
-            slopes = [((element[i+1] - pro_data[index-1][i+1])/time_delta) for i in range(len(element)-1)]
-            print(slopes)
-            xs = new_time - pro_data[index-1][0]
-            print(xs)
-            new_signals = [((slopes[i] * xs) + pro_data[index-1][i+1]) for i in range(len(slopes))]
-            new_signals.insert(0, new_time)
-            pro_data.append(new_signals)
-    """
-    #The above does the wrong thing entirely
-    
+
     for index, element in enumerate(data):
         if not index == 0:
             time_delta = (element[0] - data[index-1][0])
@@ -125,42 +113,73 @@ def process_data():
 
     return pro_data
 
+def encode(list):
+    final = ""
+    for index, element in enumerate(list):
+        final += str(element)
+        if not (index == (len(list) - 1)):
+            final += ";"
+    return final
+
+def decode(string):
+    final = string.split(";")
+    final = [float(i) for i in final]
+    return final
+
 if __name__ == "__main__":
-    input("Start?")
+    #input("Start?")
+    print("a")
     ser = serial.Serial('COM3', 9800, timeout=1)
-    data = []
-    sample_frequency = 20
-    start_time = float(time.time())
+    manager = Manager()
+    data = manager.list()
+    sample_frequency = Value("f", 20.00)
+    start = float(time.time())
+    n = 0
     while True:
         datum = ser.readline(30).decode("utf-8").strip().split(",")
         if (len(datum) < 3) or "" in datum:
             continue
-        current_time = float(time.time())
+        current = float(time.time())
         datum[len(datum)-1] = (datum[len(datum)-1])[:-1]
         datum = [int(i) for i in datum]
-        data_list = [current_time]
+        data_list = [current]
         data_list.extend(datum)
         data.append(data_list)
-        if ((current_time - start_time) > 20):
+        n += 1
+        if ((current - start) > 10):
+            print("begin new loop")
             break
 
-    stop = False
-    delete = multiprocessing.Process(target=control_overflow)
-    paccept = multiprocessing.Process(target=accept)
+    ser.close()
+    stop = Value('i', 0)
+    delete = multiprocessing.Process(target=control_overflow, args=[data, stop])
+    paccept = multiprocessing.Process(target=accept, args=[data, sample_frequency, stop])
     paccept.start()
     delete.start()
 
     paccept.join()
     delete.join()
-    
-    print(f"Difference in time between first and last element: {data[len(data)-1][0] - data[0][0]}")
 
+    print(f"Difference in time between first and last element: {data[len(data)-1][0] - data[0][0]}")
+    print(data[-1][0], time.time())
     print(np.array(data))
     pro_data = process_data()
     print(len(pro_data))
     print(np.array(pro_data))
-    #print(np.fft.fft(np.array(pro_data)))
+    for i in np.array(pro_data).T:
+        fft = np.fft.fft(i)
+        print(fft)
+        tpCount = len(i)
+        timePeriod = tpCount/sample_frequency.value
+        fft_final = fft/tpCount
+        fft_final = fft_final[range(int(len(i)/2))]
+
+        values = np.arange(int(tpCount/2))
+
+        frequencies = values/timePeriod
+
+        plt.plot(frequencies, abs(fft_final))
+        plt.show()
     #ser.readline()
     #print(ser.readline(30))
-    ser.close()
     #exit()
