@@ -20,7 +20,7 @@ void loop()
     buttonHold = digitalRead(inputButtonPin);
     if (buttonHold == HIGH && pressed == False) {
       pressed = True;
-      Serial.println("DOWN");
+      Serial.println("LOW");
     }
     if (buttonHold == LOW && pressed == True) {
       pressed = False;
