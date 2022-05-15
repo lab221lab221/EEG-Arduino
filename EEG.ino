@@ -1,22 +1,30 @@
 const int holdButtonPin = 3;
 const int inputButtonPin = 4;
 
-int counter = 0;
+bool pressed = False;
 void setup()
 {
-  pinMode(buttonPin, INPUT);
-  pinMode(redPin, OUTPUT);
-  pinMode(greenPin, OUTPUT);
-  pinMode(bluePin, OUTPUT);
+  Serial.begin(9600);
+  pinMode(holdButtonPin, INPUT);
+  pinMode(inputButtonPin, INPUT);
 }
 
 
 void loop()
 {
   int buttonState;
-  buttonState = digitalRead(buttonPin);
+  int buttonHold;
+  buttonState = digitalRead(holdButtonPin);
   
   if (buttonState==HIGH) {
-  
+    buttonHold = digitalRead(inputButtonPin);
+    if (buttonHold == HIGH && pressed == False) {
+      pressed = True;
+      Serial.println("DOWN");
+    }
+    if (buttonHold == LOW && pressed == True) {
+      pressed = False;
+      Serial.println("HIGH");
+    }
   }
 }
