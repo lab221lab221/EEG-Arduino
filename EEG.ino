@@ -2,6 +2,7 @@ const int holdButtonPin = 3;
 const int inputButtonPin = 4;
 
 bool pressed = False;
+bool held = False;
 void setup()
 {
   Serial.begin(9600);
@@ -17,6 +18,10 @@ void loop()
   buttonState = digitalRead(holdButtonPin);
   
   if (buttonState==HIGH) {
+    if (held==False) {
+      held = True
+      Serial.println("START");
+    }
     buttonHold = digitalRead(inputButtonPin);
     if (buttonHold == HIGH && pressed == False) {
       pressed = True;
@@ -26,5 +31,8 @@ void loop()
       pressed = False;
       Serial.println("HIGH");
     }
+  }
+  if (buttonState==LOW && held==True) {
+    Serial.println("END");
   }
 }
