@@ -3,6 +3,8 @@ import threading
 
 import serial
 import serial.tools.list_ports
+import numpy as np
+import matplotlib as plt
 
 """-------------------Choose COM device-------------------"""
 def connect():
@@ -28,21 +30,21 @@ def connect():
     if ser.isOpen():
         ser.close()
         
-    global ser
     ser = serial.Serial(port.device, 9600, timeout=1)
     ser.flushInput()
     ser.flushOutput()
     print(f"Connected to: {ser.name}")
+    return ser
     
 def read():
-    input = ser.readline(30).decode("utf-8")
-    while not input == "START":
-        input = ser.readline(30).decode("utf-8")
+    inputs = ser.readline(30).decode("utf-8")
+    while not inputs == "START":
+        inputs = ser.readline(30).decode("utf-8")
     func = threading.Timer(1/samplingRate, fix)
     func.start()
-    while not input == "END":
-        input = ser.readline(30).decode("utf-8")
-        if input == "HIGH":
+    while not inputs == "END":
+        inputs = ser.readline(30).decode("utf-8")
+        if inputs == "HIGH":
             global high
             high = True
             """
@@ -53,10 +55,12 @@ def read():
             if not data[index] == datum:
                 index += 1
             """
-        if input == "LOW":
+        if inputs == "LOW":
             global high
             high = False
-    func.cancel()
+        if not func.is_alive():
+            func = threading.Timer(1/samplingRate, fix)
+            func.start()
         
 def fix():
     append = 0 if not high else 1
@@ -64,9 +68,16 @@ def fix():
     data.append(append)
     
 def fft():
-    pass
+    global data
+    global output
+    output = np.fft.fft(np.Array(data))
+    plt.plot(output.toList())
     
 if __name__ == "__main__":
     samplingRate = 130
-    connect()
+    data = []
+    high = False
+    output = []
+    ser = connect()
     read()
+    fft()
